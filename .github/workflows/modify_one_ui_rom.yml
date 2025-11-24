@@ -20,6 +20,9 @@ jobs:
   build:
     runs-on: ubuntu-24.04
 
+    permissions:
+      contents: write 
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,17 +33,17 @@ jobs:
           sudo docker image prune --all --force
           sudo docker builder prune -a
           
-      - name: Installing required packages.
+      - name: Installing required packages
         run: |
           chmod +x ./scripts/install_packages.sh
           sudo bash ./scripts/install_packages.sh
 
-      - name: Starting ROM download and modification process.
+      - name: Starting ROM download and modification process
         run: |
           chmod +x ./mod_rom_1.sh
           sudo bash ./mod_rom_1.sh "${{ github.event.inputs.DEVICE_MODEL }}" "${{ github.event.inputs.CSC }}" "${{ github.event.inputs.IMEI }}"
 
-      - name: Splitting files before uploading if need.
+      - name: Splitting files before uploading if needed
         run: |
           GIT_SUPPORT_SIZE=2147000000
           OUT_DIR="./out"
@@ -51,12 +54,12 @@ jobs:
             FILE_SIZE=$(stat -c%s "$file")
             if [ "$FILE_SIZE" -gt "$GIT_SUPPORT_SIZE" ]; then
               echo "📦 Splitting: $file (Size: $FILE_SIZE bytes)"
-              sudo split -b "$GIT_SUPPORT_SIZE" -d -a 3 "$file" "$file.part"
-              sudo rm -f "$file"
+              split -b "$GIT_SUPPORT_SIZE" -d -a 3 "$file" "$file.part"
+              rm -f "$file"
             fi
           done
 
-      - name: Uploading all files to GitHub Release.
+      - name: Uploading all files to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "build-${{ github.run_id }}"
@@ -68,8 +71,8 @@ jobs:
           files: |
             ./out/*
         env:
-          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+          GITHUB_TOKEN: ${{GH_PAT}}
 
-      - name: Cleaning everything.
+      - name: Cleaning everything
         run: |
           sudo rm -rf *
