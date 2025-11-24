@@ -1,0 +1,75 @@
+name: QuantumROM Tools
+
+on:
+  workflow_dispatch:
+    inputs:
+      DEVICE_MODEL:
+        description: "Enter the DEVICE_MODEL."
+        required: true
+        default: "SM-A226B"
+      CSC:
+        description: "Enter the CSC (Country Specific Code)."
+        required: true
+        default: "MID"
+      IMEI:
+        description: "Enter the device IMEI number."
+        required: true
+        default: "351835828624498"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          sudo docker image prune --all --force
+          sudo docker builder prune -a
+          
+      - name: Installing required packages.
+        run: |
+          chmod +x ./scripts/install_packages.sh
+          sudo bash ./scripts/install_packages.sh
+
+      - name: Starting ROM download and modification process.
+        run: |
+          chmod +x ./mod_rom_1.sh
+          sudo bash ./mod_rom_1.sh "${{ github.event.inputs.DEVICE_MODEL }}" "${{ github.event.inputs.CSC }}" "${{ github.event.inputs.IMEI }}"
+
+      - name: Splitting files before uploading if need.
+        run: |
+          GIT_SUPPORT_SIZE=2147000000
+          OUT_DIR="./out"
+          echo "--- Checking for large files in $OUT_DIR ---"
+
+          for file in "$OUT_DIR"/*; do
+            [ -f "$file" ] || continue
+            FILE_SIZE=$(stat -c%s "$file")
+            if [ "$FILE_SIZE" -gt "$GIT_SUPPORT_SIZE" ]; then
+              echo "📦 Splitting: $file (Size: $FILE_SIZE bytes)"
+              sudo split -b "$GIT_SUPPORT_SIZE" -d -a 3 "$file" "$file.part"
+              sudo rm -f "$file"
+            fi
+          done
+
+      - name: Uploading all files to GitHub Release.
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "build-${{ github.run_id }}"
+          name: "QuantumROM Build: ${{ github.run_id }}"
+          body: |
+            ***Build Information***
+            - 📱 Device Model: ${{ github.event.inputs.DEVICE_MODEL }}
+            - 🌍 Rom CSC: ${{ github.event.inputs.CSC }}
+          files: |
+            ./out/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
+
+      - name: Cleaning everything.
+        run: |
+          sudo rm -rf *
