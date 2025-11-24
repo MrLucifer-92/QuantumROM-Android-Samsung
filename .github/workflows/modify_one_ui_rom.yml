@@ -71,7 +71,7 @@ jobs:
           files: |
             ./out/*
         env:
-          GITHUB_TOKEN: ${{GH_PAT}}
+          GITHUB_TOKEN: ${{ secrets.GIT_TOKEN }}
 
       - name: Cleaning everything
         run: |
